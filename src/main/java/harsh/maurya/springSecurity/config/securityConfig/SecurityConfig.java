@@ -1,5 +1,6 @@
 package harsh.maurya.springSecurity.config.securityConfig;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -9,15 +10,20 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import static org.springframework.security.config.Customizer.withDefaults;
+import javax.sql.DataSource;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    @Autowired
+    private DataSource datasource;
     /**
      * 
      * @param takes http request 
@@ -31,7 +37,13 @@ public class SecurityConfig {
         /**
          * it specify that all http requests should be autenticated.
          */
-        http.authorizeHttpRequests((request)-> request.anyRequest().authenticated());
+        http.authorizeHttpRequests((request)-> request.requestMatchers("/h2-console/**").permitAll()
+        .anyRequest().authenticated());
+
+       http.headers(headers -> headers
+        .frameOptions(frame -> frame.sameOrigin()));
+        http.csrf((csrf) -> csrf.disable());
+
         
         //crate the the request state less or rest 
 
@@ -54,17 +66,25 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService uuserDetailsService(){
+    public UserDetailsService userDetailsService(){
 
         UserDetails user1 = User.withUsername("user1")
-                            .password("{noop}password1")
+                            .password(passwordEncoder().encode("password1"))
                             .roles("USER")
                             .build();
         UserDetails admin = User.withUsername("admin")                  
-                            .password("{noop}passwordadmin")
+                            .password(passwordEncoder().encode("passwordadmin"))
                             .roles("ADMIN")
                             .build();
         
-        return new InMemoryUserDetailsManager(user1, admin);
+        JdbcUserDetailsManager userDetailsManager = new JdbcUserDetailsManager(datasource);
+        userDetailsManager.createUser(user1);
+        userDetailsManager.createUser(admin);
+        return userDetailsManager;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }
