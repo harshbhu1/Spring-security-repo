@@ -11,8 +11,6 @@ spring:
   h2:
     console:
       enabled: true
-
-  
 server:
   port: 7272
 
